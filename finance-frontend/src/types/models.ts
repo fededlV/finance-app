@@ -14,6 +14,7 @@ export interface ApiErrorResponse {
 export interface Categoria {
   id: ID;
   nombre: string;
+  color?: string;
   created_at?: string;
   updated_at?: string;
 }
