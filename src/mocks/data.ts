@@ -18,7 +18,7 @@ export const CATEGORIAS = [
 ];
 
 export const TRANSACCIONES_MOCK: Transaccion[] = [
-  { id: '1', tipo: 'ingreso', categoria: 'trabajo', descripcion: 'Sueldo Mayo', monto: 850000, fecha: '2026-05-01' },
+  { id: '1', tipo: 'ingreso', categoria: 'trabajo', descripcion: 'Sueldo Mayo', monto: 1200000, fecha: '2026-05-01' },
   { id: '2', tipo: 'gasto', categoria: 'hogar', descripcion: 'Alquiler Depto', monto: 350000, fecha: '2026-05-02' },
   { id: '3', tipo: 'gasto', categoria: 'comida', descripcion: 'Supermercado Coto', monto: 45000, fecha: '2026-05-03' },
   { id: '4', tipo: 'ahorro', categoria: 'ahorro', descripcion: 'Compra USD MEP', monto: 100000, fecha: '2026-05-04' },

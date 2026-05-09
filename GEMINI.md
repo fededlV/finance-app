@@ -29,6 +29,6 @@ A continuación se detallan los comandos disponibles para el desarrollo:
 - **Variables de Entorno**: Es obligatorio configurar `EXPO_PUBLIC_API_URL` en el entorno para que la aplicación pueda comunicarse con el backend.
 
 ## TODOs Pendientes
-- [ ] Implementar la navegación (React Navigation o Expo Router).
+- [x] Implementar la navegación (Expo Router).
 - [ ] Desarrollar los componentes de UI para visualización de gastos y ahorros.
 - [ ] Configurar validaciones de formularios para la creación de registros.

@@ -6,8 +6,8 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Transaccion } from '../types';
-import { CATEGORIAS } from '../mocks/data';
+import { Transaccion } from '../../types';
+import { CATEGORIAS } from '../../mocks/data';
 
 interface Props {
   transaccion: Transaccion;

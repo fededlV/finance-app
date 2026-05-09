@@ -1,6 +1,6 @@
 /**
  * Propósito: Botón de filtro horizontal para seleccionar categorías.
- * Ubicación: src/components/CategoriaChip.tsx
+ * Ubicación: src/components/ui/CategoriaChip.tsx
  */
 
 import React from 'react';

@@ -53,3 +53,13 @@ Este archivo es la memoria técnica definitiva del estado actual de la aplicaci�
 2.  **Gestos (UX)**: Implementar `react-native-gesture-handler` para Swipe-to-delete real.
 3.  **Mejoras de Formulario**: Añadir un `DatePicker` nativo estilizado.
 4.  **Notificaciones**: Feedback visual más pulido al realizar acciones.
+
+
+ 1. Jerarquía Visual y Pulido de Componentes: Refinar SaldoCard con iconos contextuales y mejorar la
+      legibilidad de TransaccionItem.
+   2. Micro-interacciones: Implementar animaciones de entrada para las tarjetas y la lista utilizando
+      react-native-reanimated, haciendo que la app se sienta "viva".
+   3. Consistencia de Diseño: Migrar ResumenScreen (que actualmente usa StyleSheet tradicional) a NativeWind,
+      para que herede automáticamente el soporte de Dark Mode y las variables de diseño globales.
+   4. Feedback Háptico y Gestos: Si estás de acuerdo, podemos preparar el terreno para el "Swipe-to-delete" y
+      añadir feedback táctil en acciones clave.

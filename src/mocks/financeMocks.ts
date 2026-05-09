@@ -45,7 +45,7 @@ export const MOCK_GASTOS: Gasto[] = [
   },
 ];
 
-export const CATEGORY_ICONS: Record<number, string> = {
+export const CATEGORY_ICONS: Record<string | number, string> = {
   1: 'shopping-cart',
   2: 'wifi',
   3: 'coffee',
