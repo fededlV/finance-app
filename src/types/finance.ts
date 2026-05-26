@@ -44,24 +44,29 @@ export interface Presupuesto {
   updated_at?: string;
 }
 
-export interface ResumenCategoria {
+export interface GastoPorCategoria {
   categoria_id: number;
-  categoria?: string;
-  monto_gastado: number;
-  monto_presupuestado?: number | null;
-  monto_restante?: number | null;
+  nombre: string;
+  total: number;
+  porcentaje: number;
+}
+
+export interface PresupuestoEstado {
+  categoria_id: number;
+  limite: number;
+  gastado: number;
+  porcentaje_usado: number;
 }
 
 export interface Resumen {
-  periodo_id: number;
-  dinero_inicial: number;
-  total_gastos: number;
-  total_ahorros_ars: number;
-  total_ahorros_usd: number;
-  total_ahorros_usd_en_ars: number;
-  saldo_final: number;
-  presupuestos?: ResumenCategoria[];
-  [key: string]: unknown;
+  periodo: Periodo;
+  total_gastado: number;
+  total_ahorrado_ars: number;
+  total_ahorrado_usd: number;
+  saldo_disponible: number;
+  porcentaje_ahorro: number;
+  gastos_por_categoria: GastoPorCategoria[];
+  presupuestos_estado: PresupuestoEstado[];
 }
 
 export interface CrearPeriodoInput {
@@ -70,6 +75,12 @@ export interface CrearPeriodoInput {
   dinero_inicial: number;
   tipo_cambio_usd?: number | null;
 }
+
+export interface ActualizarPeriodoInput {
+  dinero_inicial?: number;
+  tipo_cambio_usd?: number | null;
+}
+
 
 export interface CrearGastoInput {
   periodo_id: number;

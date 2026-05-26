@@ -1,13 +1,41 @@
 import { Gasto, Resumen, Ahorro } from '../types/finance';
 
 export const MOCK_RESUMEN: Resumen = {
-  periodo_id: 1,
-  dinero_inicial: 50000000, // $500,000.00
-  total_gastos: 15000000,   // $150,000.00
-  total_ahorros_ars: 5000000, // $50,000.00
-  total_ahorros_usd: 100,     // $100.00
-  total_ahorros_usd_en_ars: 12000000, // $120,000.00 (ejemplo TC 1200)
-  saldo_final: 35000000,    // $350,000.00
+  periodo: {
+    id: 1,
+    mes: 5,
+    anio: 2026,
+    dinero_inicial: 500000, // $500,000.00
+    tipo_cambio_usd: 1200,
+    created_at: '2026-05-01T10:00:00Z',
+  },
+  total_gastado: 150000, // $150,000.00
+  total_ahorrado_ars: 50000, // $50,000.00
+  total_ahorrado_usd: 100, // $100.00
+  saldo_disponible: 300000, // $300,000.00
+  porcentaje_ahorro: 25.0,
+  gastos_por_categoria: [
+    {
+      categoria_id: 1,
+      nombre: 'Comida',
+      total: 45000,
+      porcentaje: 30,
+    },
+    {
+      categoria_id: 2,
+      nombre: 'Hogar',
+      total: 15000,
+      porcentaje: 10,
+    },
+  ],
+  presupuestos_estado: [
+    {
+      categoria_id: 1,
+      limite: 100000,
+      gastado: 45000,
+      porcentaje_usado: 45,
+    },
+  ],
 };
 
 export const MOCK_GASTOS: Gasto[] = [

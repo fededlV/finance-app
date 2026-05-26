@@ -5,11 +5,13 @@ import type {
   CrearAhorroInput,
   CrearGastoInput,
   CrearPeriodoInput,
+  ActualizarPeriodoInput,
   Gasto,
   GetGastosFiltros,
   Periodo,
   Resumen,
-  ResumenCategoria,
+  GastoPorCategoria,
+  PresupuestoEstado,
 } from '../types/finance';
 
 const HANDLED_ERROR_STATUSES = new Set([400, 404, 409, 422, 500]);
@@ -17,8 +19,9 @@ const MONEY_FACTOR = 100;
 
 type RequestMode = 'standard' | 'direct';
 
-type PeriodoApi = Omit<Periodo, 'dinero_inicial'> & {
+type PeriodoApi = Omit<Periodo, 'dinero_inicial' | 'created_at' | 'updated_at'> & {
   dinero_inicial: number;
+  creado_en: string;
 };
 
 type GastoApi = Omit<Gasto, 'monto'> & {
@@ -29,23 +32,34 @@ type AhorroApi = Omit<Ahorro, 'monto'> & {
   monto: number;
 };
 
-type ResumenCategoriaApi = Omit<ResumenCategoria, 'monto_gastado' | 'monto_presupuestado' | 'monto_restante'> & {
-  monto_gastado: number;
-  monto_presupuestado?: number | null;
-  monto_restante?: number | null;
+type GastoPorCategoriaApi = Omit<GastoPorCategoria, 'total'> & {
+  total: number;
+};
+
+type PresupuestoEstadoApi = Omit<PresupuestoEstado, 'limite' | 'gastado'> & {
+  limite: number;
+  gastado: number;
 };
 
 type ResumenApi = {
-  periodo_id: number;
-  dinero_inicial: number;
-  total_gastos: number;
-  total_ahorros_ars: number;
-  total_ahorros_usd: number;
-  total_ahorros_usd_en_ars: number;
-  saldo_final: number;
-  presupuestos?: ResumenCategoriaApi[];
-  [key: string]: unknown;
+  periodo: PeriodoApi;
+  total_gastado: number;
+  total_ahorrado_ars: number;
+  total_ahorrado_usd: number;
+  saldo_disponible: number;
+  porcentaje_ahorro: number;
+  gastos_por_categoria: GastoPorCategoriaApi[];
+  presupuestos_estado: PresupuestoEstadoApi[];
 };
+
+export class ApiError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
 
 class ApiRequestError extends Error {
   status: number;
@@ -69,23 +83,25 @@ const getApiBaseUrl = (): string => {
   return baseUrl.replace(/\/+$/, '');
 };
 
+
+
 const toCents = (value: number): number => Math.round(value * MONEY_FACTOR);
 const fromCents = (value: number): number => value / MONEY_FACTOR;
 
 const toFriendlyError = (error: unknown): Error => {
   if (error instanceof ApiRequestError) {
     if (HANDLED_ERROR_STATUSES.has(error.status)) {
-      return new Error(error.message);
+      return new ApiError(error.message, error.status);
     }
 
-    return new Error(`Error HTTP ${error.status}: ${error.message}`);
+    return new ApiError(`Error HTTP ${error.status}: ${error.message}`, error.status);
   }
 
   if (error instanceof Error) {
     return error;
   }
 
-  return new Error('Error inesperado al consumir la API.');
+  return new ApiError('Error inesperado al consumir la API.');
 };
 
 const buildQueryString = (query?: GetGastosFiltros): string => {
@@ -150,10 +166,14 @@ const request = async <T>(
   return payload.data;
 };
 
-const normalizePeriodo = (periodo: PeriodoApi): Periodo => ({
-  ...periodo,
-  dinero_inicial: fromCents(periodo.dinero_inicial),
-});
+const normalizePeriodo = (periodo: PeriodoApi): Periodo => {
+  const { creado_en, ...rest } = periodo;
+  return {
+    ...rest,
+    dinero_inicial: fromCents(periodo.dinero_inicial),
+    created_at: creado_en,
+  };
+};
 
 const normalizeGasto = (gasto: GastoApi): Gasto => ({
   ...gasto,
@@ -165,23 +185,26 @@ const normalizeAhorro = (ahorro: AhorroApi): Ahorro => ({
   monto: fromCents(ahorro.monto),
 });
 
-const normalizeResumenCategoria = (categoria: ResumenCategoriaApi): ResumenCategoria => ({
-  ...categoria,
-  monto_gastado: fromCents(categoria.monto_gastado),
-  monto_presupuestado:
-    typeof categoria.monto_presupuestado === 'number' ? fromCents(categoria.monto_presupuestado) : categoria.monto_presupuestado,
-  monto_restante: typeof categoria.monto_restante === 'number' ? fromCents(categoria.monto_restante) : categoria.monto_restante,
+const normalizeGastoPorCategoria = (gastoCat: GastoPorCategoriaApi): GastoPorCategoria => ({
+  ...gastoCat,
+  total: fromCents(gastoCat.total),
+});
+
+const normalizePresupuestoEstado = (presupuestoEst: PresupuestoEstadoApi): PresupuestoEstado => ({
+  ...presupuestoEst,
+  limite: fromCents(presupuestoEst.limite),
+  gastado: fromCents(presupuestoEst.gastado),
 });
 
 const normalizeResumen = (resumen: ResumenApi): Resumen => ({
-  ...resumen,
-  dinero_inicial: fromCents(resumen.dinero_inicial),
-  total_gastos: fromCents(resumen.total_gastos),
-  total_ahorros_ars: fromCents(resumen.total_ahorros_ars),
-  total_ahorros_usd: fromCents(resumen.total_ahorros_usd),
-  total_ahorros_usd_en_ars: fromCents(resumen.total_ahorros_usd_en_ars),
-  saldo_final: fromCents(resumen.saldo_final),
-  presupuestos: resumen.presupuestos?.map(normalizeResumenCategoria),
+  periodo: normalizePeriodo(resumen.periodo),
+  total_gastado: fromCents(resumen.total_gastado),
+  total_ahorrado_ars: fromCents(resumen.total_ahorrado_ars),
+  total_ahorrado_usd: fromCents(resumen.total_ahorrado_usd),
+  saldo_disponible: fromCents(resumen.saldo_disponible),
+  porcentaje_ahorro: resumen.porcentaje_ahorro,
+  gastos_por_categoria: resumen.gastos_por_categoria.map(normalizeGastoPorCategoria),
+  presupuestos_estado: resumen.presupuestos_estado.map(normalizePresupuestoEstado),
 });
 
 export const api = {
@@ -205,6 +228,30 @@ export const api = {
         '/periodos',
         {
           method: 'POST',
+          body: JSON.stringify(payload),
+        },
+      );
+
+      return normalizePeriodo(periodo);
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async actualizarPeriodo(id: number, data: ActualizarPeriodoInput): Promise<Periodo> {
+    try {
+      const payload: any = {};
+      if (data.dinero_inicial !== undefined) {
+        payload.dinero_inicial = toCents(data.dinero_inicial);
+      }
+      if (data.tipo_cambio_usd !== undefined) {
+        payload.tipo_cambio_usd = data.tipo_cambio_usd;
+      }
+
+      const periodo = await request<PeriodoApi>(
+        `/periodos/${id}`,
+        {
+          method: 'PATCH',
           body: JSON.stringify(payload),
         },
       );
