@@ -16,7 +16,6 @@ import type {
   CrearIngresoInput,
   GetIngresosFiltros,
 } from '../types/finance';
-
 const HANDLED_ERROR_STATUSES = new Set([400, 404, 409, 422, 500]);
 const MONEY_FACTOR = 100;
 
@@ -70,6 +69,24 @@ export class ApiError extends Error {
   }
 }
 
+export class NetworkError extends Error {
+  originalError?: unknown;
+  constructor(message: string, originalError?: unknown) {
+    super(message);
+    this.name = 'NetworkError';
+    this.originalError = originalError;
+  }
+}
+
+export class ParsingError extends Error {
+  originalError?: unknown;
+  constructor(message: string, originalError?: unknown) {
+    super(message);
+    this.name = 'ParsingError';
+    this.originalError = originalError;
+  }
+}
+
 class ApiRequestError extends Error {
   status: number;
   details?: unknown;
@@ -98,12 +115,20 @@ const toCents = (value: number): number => Math.round(value * MONEY_FACTOR);
 const fromCents = (value: number): number => value / MONEY_FACTOR;
 
 const toFriendlyError = (error: unknown): Error => {
+  if (error instanceof NetworkError || error instanceof ParsingError || error instanceof ApiError) {
+    return error;
+  }
+
   if (error instanceof ApiRequestError) {
     if (HANDLED_ERROR_STATUSES.has(error.status)) {
       return new ApiError(error.message, error.status);
     }
 
     return new ApiError(`Error HTTP ${error.status}: ${error.message}`, error.status);
+  }
+
+  if (error instanceof TypeError || error instanceof ReferenceError || error instanceof SyntaxError) {
+    return new ParsingError(`Error de ejecución en el cliente: ${(error as Error).message}`, error);
   }
 
   if (error instanceof Error) {
@@ -135,8 +160,8 @@ const parseJsonBody = async (response: Response): Promise<unknown> => {
 
   try {
     return JSON.parse(text) as unknown;
-  } catch {
-    throw new ApiRequestError('La respuesta del servidor no tiene formato JSON valido.', response.status);
+  } catch (err) {
+    throw new ParsingError('La respuesta del servidor no tiene formato JSON valido.', err);
   }
 };
 
@@ -146,14 +171,19 @@ const request = async <T>(
   mode: RequestMode = 'standard',
 ): Promise<T> => {
   const baseUrl = getApiBaseUrl();
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
-      ...(options.headers ?? {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+        ...(options.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    throw new NetworkError('No se pudo conectar con el servidor. Verifica tu conexión de red.', err);
+  }
 
   const jsonBody = await parseJsonBody(response);
 
@@ -169,63 +199,95 @@ const request = async <T>(
 
   const payload = (jsonBody ?? {}) as ApiSuccessResponse<T>;
 
-  if (!('data' in payload)) {
-    throw new ApiRequestError('La respuesta no incluye la propiedad data esperada.', response.status);
+  if (!payload || !('data' in payload)) {
+    throw new ParsingError('La respuesta no incluye la propiedad data esperada.');
   }
 
   return payload.data;
 };
 
-const normalizePeriodo = (periodo: PeriodoApi): Periodo => {
+const normalizePeriodo = (periodo: PeriodoApi | null | undefined): Periodo => {
+  if (!periodo) {
+    return {
+      id: 0,
+      mes: new Date().getMonth() + 1,
+      anio: new Date().getFullYear(),
+      dinero_inicial: 0,
+      tipo_cambio_usd: null,
+    };
+  }
   const { creado_en, ...rest } = periodo;
   return {
     ...rest,
-    dinero_inicial: periodo.dinero_inicial,
-    created_at: creado_en,
+    dinero_inicial: periodo.dinero_inicial ?? 0,
+    created_at: creado_en ?? undefined,
   };
 };
 
-const normalizeGasto = (gasto: GastoApi): Gasto => ({
-  ...gasto,
-  monto: gasto.monto,
+const normalizeGasto = (gasto: GastoApi | null | undefined): Gasto => ({
+  id: gasto?.id ?? 0,
+  periodo_id: gasto?.periodo_id ?? 0,
+  categoria_id: gasto?.categoria_id ?? 0,
+  descripcion: gasto?.descripcion ?? '',
+  monto: gasto?.monto ?? 0,
+  fecha: gasto?.fecha ?? '',
+  nota: gasto?.nota ?? null,
+  created_at: gasto?.created_at,
+  updated_at: gasto?.updated_at,
 });
 
-const normalizeAhorro = (ahorro: AhorroApi): Ahorro => ({
-  ...ahorro,
-  monto: ahorro.monto,
+const normalizeAhorro = (ahorro: AhorroApi | null | undefined): Ahorro => ({
+  id: ahorro?.id ?? 0,
+  periodo_id: ahorro?.periodo_id ?? 0,
+  descripcion: ahorro?.descripcion ?? '',
+  monto: ahorro?.monto ?? 0,
+  moneda: ahorro?.moneda ?? 'ARS',
+  origen: ahorro?.origen ?? null,
+  fecha: ahorro?.fecha ?? '',
+  nota: ahorro?.nota ?? null,
+  created_at: ahorro?.created_at,
+  updated_at: ahorro?.updated_at,
 });
 
-const normalizeGastoPorCategoria = (gastoCat: GastoPorCategoriaApi): GastoPorCategoria => ({
-  ...gastoCat,
-  total: gastoCat.total,
+const normalizeGastoPorCategoria = (gastoCat: GastoPorCategoriaApi | null | undefined): GastoPorCategoria => ({
+  categoria_id: gastoCat?.categoria_id ?? 0,
+  nombre: gastoCat?.nombre ?? '',
+  total: gastoCat?.total ?? 0,
+  porcentaje: gastoCat?.porcentaje ?? 0,
 });
 
-const normalizePresupuestoEstado = (presupuestoEst: PresupuestoEstadoApi): PresupuestoEstado => ({
-  ...presupuestoEst,
-  limite: presupuestoEst.limite,
-  gastado: presupuestoEst.gastado,
+const normalizePresupuestoEstado = (presupuestoEst: PresupuestoEstadoApi | null | undefined): PresupuestoEstado => ({
+  categoria_id: presupuestoEst?.categoria_id ?? 0,
+  limite: presupuestoEst?.limite ?? 0,
+  gastado: presupuestoEst?.gastado ?? 0,
+  porcentaje_usado: presupuestoEst?.porcentaje_usado ?? 0,
 });
 
-const normalizeIngreso = (ingreso: IngresoApi): Ingreso => {
-  const { creado_en, modificado_en, ...rest } = ingreso;
+const normalizeIngreso = (ingreso: IngresoApi | null | undefined): Ingreso => {
+  const creado_en = ingreso?.creado_en;
+  const modificado_en = ingreso?.modificado_en;
   return {
-    ...rest,
-    monto: ingreso.monto,
-    created_at: creado_en,
+    id: ingreso?.id ?? 0,
+    periodo_id: ingreso?.periodo_id ?? 0,
+    descripcion: ingreso?.descripcion ?? '',
+    monto: ingreso?.monto ?? 0,
+    fecha: ingreso?.fecha ?? '',
+    nota: ingreso?.nota ?? null,
+    created_at: creado_en ?? undefined,
     updated_at: modificado_en ?? undefined,
   };
 };
 
-const normalizeResumen = (resumen: ResumenApi): Resumen => ({
-  periodo: normalizePeriodo(resumen.periodo),
-  total_ingresado: resumen.total_ingresado,
-  total_gastado: resumen.total_gastado,
-  total_ahorrado_ars: resumen.total_ahorrado_ars,
-  total_ahorrado_usd: resumen.total_ahorrado_usd,
-  saldo_disponible: resumen.saldo_disponible,
-  porcentaje_ahorro: resumen.porcentaje_ahorro,
-  gastos_por_categoria: resumen.gastos_por_categoria.map(normalizeGastoPorCategoria),
-  presupuestos_estado: resumen.presupuestos_estado.map(normalizePresupuestoEstado),
+const normalizeResumen = (resumen: ResumenApi | null | undefined): Resumen => ({
+  periodo: normalizePeriodo(resumen?.periodo),
+  total_ingresado: resumen?.total_ingresado ?? 0,
+  total_gastado: resumen?.total_gastado ?? 0,
+  total_ahorrado_ars: resumen?.total_ahorrado_ars ?? 0,
+  total_ahorrado_usd: resumen?.total_ahorrado_usd ?? 0,
+  saldo_disponible: resumen?.saldo_disponible ?? 0,
+  porcentaje_ahorro: resumen?.porcentaje_ahorro ?? 0,
+  gastos_por_categoria: (resumen?.gastos_por_categoria ?? []).map(normalizeGastoPorCategoria),
+  presupuestos_estado: (resumen?.presupuestos_estado ?? []).map(normalizePresupuestoEstado),
 });
 
 export const api = {
@@ -287,7 +349,7 @@ export const api = {
     try {
       const queryString = buildQueryString(filtros);
       const gastos = await request<GastoApi[]>(`/gastos${queryString}`, { method: 'GET' });
-      return gastos.map(normalizeGasto);
+      return (gastos ?? []).map(normalizeGasto);
     } catch (error) {
       throw toFriendlyError(error);
     }
@@ -317,7 +379,7 @@ export const api = {
   async getAhorros(): Promise<Ahorro[]> {
     try {
       const ahorros = await request<AhorroApi[]>('/ahorros', { method: 'GET' });
-      return ahorros.map(normalizeAhorro);
+      return (ahorros ?? []).map(normalizeAhorro);
     } catch (error) {
       throw toFriendlyError(error);
     }
@@ -357,7 +419,7 @@ export const api = {
     try {
       const queryString = buildQueryString(filtros as any);
       const ingresos = await request<IngresoApi[]>(`/ingresos${queryString}`, { method: 'GET' });
-      return ingresos.map(normalizeIngreso);
+      return (ingresos ?? []).map(normalizeIngreso);
     } catch (error) {
       throw toFriendlyError(error);
     }

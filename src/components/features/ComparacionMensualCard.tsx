@@ -9,24 +9,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatMoney } from '../../utils/currency';
 
 interface Props {
-  actual: number;
-  anterior: number;
+  actual?: number;
+  anterior?: number;
   titulo: string;
   tipo: 'gasto' | 'ahorro';
 }
 
-const ComparacionMensualCard: React.FC<Props> = ({ actual, anterior, titulo, tipo }) => {
-  const diferencia = actual - anterior;
-  const porcentaje = anterior > 0 ? (Math.abs(diferencia) / anterior) * 100 : 0;
+const ComparacionMensualCard: React.FC<Props> = ({ actual = 0, anterior = 0, titulo, tipo }) => {
+  const safeActual = actual ?? 0;
+  const safeAnterior = anterior ?? 0;
+  const diferencia = safeActual - safeAnterior;
+  const porcentaje = safeAnterior > 0 ? (Math.abs(diferencia) / safeAnterior) * 100 : 0;
   
-  const esExito = tipo === 'gasto' ? actual < anterior : actual > anterior;
+  const esExito = tipo === 'gasto' ? safeActual < safeAnterior : safeActual > safeAnterior;
   const color = esExito ? '#52B788' : '#791F1F';
   const icon = tipo === 'gasto' 
-    ? (actual < anterior ? 'arrow-down' : 'arrow-up')
-    : (actual > anterior ? 'arrow-up' : 'arrow-down');
+    ? (safeActual < safeAnterior ? 'arrow-down' : 'arrow-up')
+    : (safeActual > safeAnterior ? 'arrow-up' : 'arrow-down');
 
   const formatCurrency = (monto: number) => {
-    return formatMoney(monto, 'ARS');
+    return formatMoney(monto ?? 0, 'ARS');
   };
 
   return (
