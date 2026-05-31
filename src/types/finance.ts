@@ -60,6 +60,7 @@ export interface PresupuestoEstado {
 
 export interface Resumen {
   periodo: Periodo;
+  total_ingresado: number;
   total_gastado: number;
   total_ahorrado_ars: number;
   total_ahorrado_usd: number;
@@ -67,6 +68,29 @@ export interface Resumen {
   porcentaje_ahorro: number;
   gastos_por_categoria: GastoPorCategoria[];
   presupuestos_estado: PresupuestoEstado[];
+}
+
+export interface Ingreso {
+  id: number;
+  periodo_id: number;
+  descripcion: string;
+  monto: number;
+  fecha: string;
+  nota?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CrearIngresoInput {
+  periodo_id: number;
+  descripcion: string;
+  monto: number;
+  fecha: string;
+  nota?: string;
+}
+
+export interface GetIngresosFiltros {
+  periodo_id?: number;
 }
 
 export interface CrearPeriodoInput {

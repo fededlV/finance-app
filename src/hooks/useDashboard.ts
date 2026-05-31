@@ -23,6 +23,7 @@ export function useDashboard() {
       let resumenData: any = null;
       let gastosData: any[] = [];
       let ahorrosData: any[] = [];
+      let ingresosData: any[] = [];
 
       try {
         currentPeriod = await api.getPeriodoActual();
@@ -31,13 +32,15 @@ export function useDashboard() {
         // 2. Obtener resumen del período
         resumenData = await api.getResumen(currentPeriod.id);
 
-        // 3. Obtener gastos y ahorros en paralelo
-        const [gastos, ahorros] = await Promise.all([
+        // 3. Obtener gastos, ahorros e ingresos en paralelo
+        const [gastos, ahorros, ingresos] = await Promise.all([
           api.getGastos({ periodo_id: currentPeriod.id }),
           api.getAhorros(),
+          api.getIngresos({ periodo_id: currentPeriod.id }),
         ]);
         gastosData = gastos;
         ahorrosData = ahorros;
+        ingresosData = ingresos;
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
           const now = new Date();
@@ -70,7 +73,7 @@ export function useDashboard() {
 
         setBalance({
           total: resumenData.saldo_disponible,
-          ingresos: resumenData.periodo.dinero_inicial,
+          ingresos: resumenData.total_ingresado,
           egresos: resumenData.total_gastado,
           ahorros: totalAhorradoArs,
         });
@@ -97,8 +100,18 @@ export function useDashboard() {
             fecha: a.fecha,
           }));
 
+        // Mapear ingresos de base de datos a Transaccion de la UI
+        const transaccionesIngresos: Transaccion[] = ingresosData.map((i) => ({
+          id: `i-db-${i.id}`,
+          tipo: 'ingreso',
+          categoria: 'trabajo',
+          descripcion: i.descripcion,
+          monto: i.monto,
+          fecha: i.fecha,
+        }));
+
         // Registrar dinero inicial como una transacción virtual de ingreso
-        const transaccionIngreso: Transaccion = {
+        const transaccionInicial: Transaccion = {
           id: `i-${currentPeriod.id}`,
           tipo: 'ingreso',
           categoria: 'trabajo',
@@ -107,7 +120,7 @@ export function useDashboard() {
           fecha: currentPeriod.created_at ? currentPeriod.created_at.split('T')[0] : '2026-05-01',
         };
 
-        const todas = [transaccionIngreso, ...transaccionesGastos, ...transaccionesAhorros];
+        const todas = [transaccionInicial, ...transaccionesIngresos, ...transaccionesGastos, ...transaccionesAhorros];
 
         // Ordenar cronológicamente en orden descendente y limitar a 5
         const ordenadas = todas

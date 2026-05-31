@@ -8,6 +8,7 @@ import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Transaccion } from '../../types';
 import { CATEGORIAS } from '../../mocks/data';
+import { formatMoney } from '../../utils/currency';
 
 interface Props {
   transaccion: Transaccion;
@@ -26,10 +27,7 @@ const TransaccionItem: React.FC<Props> = ({ transaccion }) => {
   };
 
   const formatMonto = (monto: number) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
-    }).format(monto);
+    return formatMoney(monto, 'ARS');
   };
 
   return (
