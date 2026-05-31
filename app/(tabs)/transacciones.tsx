@@ -18,7 +18,7 @@ export default function TransaccionesScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   
-  const transacciones = useFinanceStore(state => state.transacciones);
+  const transacciones = useFinanceStore(state => state.transacciones) ?? [];
   const deleteTransaccion = useFinanceStore(state => state.deleteTransaccion);
   
   // Tab activa: 'gasto' | 'ingreso' | 'ahorro'
@@ -29,9 +29,9 @@ export default function TransaccionesScreen() {
   // Filtro de categoría (solo aplica si activeTab === 'gasto')
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string | null>(null);
 
-  const data = transacciones.filter(t => t.tipo === activeTab);
+  const data = transacciones.filter(t => t?.tipo === activeTab);
   const filteredData = (activeTab === 'gasto' && categoriaSeleccionada)
-    ? data.filter(g => g.categoria === categoriaSeleccionada)
+    ? data.filter(g => g?.categoria === categoriaSeleccionada)
     : data;
 
   const confirmDelete = (id: string) => {

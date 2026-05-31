@@ -5,7 +5,7 @@ import { Periodo } from '../types/finance';
 
 export function useDashboard() {
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [periodo, setPeriodo] = useState<Periodo | null>(null);
   const [balance, setBalance] = useState({
     total: 0,
@@ -30,13 +30,13 @@ export function useDashboard() {
         setPeriodo(currentPeriod);
 
         // 2. Obtener resumen del período
-        resumenData = await api.getResumen(currentPeriod.id);
+        resumenData = await api.getResumen(currentPeriod?.id ?? 0);
 
         // 3. Obtener gastos, ahorros e ingresos en paralelo
         const [gastos, ahorros, ingresos] = await Promise.all([
-          api.getGastos({ periodo_id: currentPeriod.id }),
+          api.getGastos({ periodo_id: currentPeriod?.id ?? 0 }),
           api.getAhorros(),
-          api.getIngresos({ periodo_id: currentPeriod.id }),
+          api.getIngresos({ periodo_id: currentPeriod?.id ?? 0 }),
         ]);
         gastosData = gastos;
         ahorrosData = ahorros;
@@ -57,9 +57,9 @@ export function useDashboard() {
         }
       }
 
-      const tipoCambio = currentPeriod.tipo_cambio_usd ?? 1;
+      const tipoCambio = currentPeriod?.tipo_cambio_usd ?? 1;
 
-      if (currentPeriod.id === 0) {
+      if (!currentPeriod || currentPeriod.id === 0) {
         setBalance({
           total: 0,
           ingresos: 0,
@@ -69,45 +69,45 @@ export function useDashboard() {
         setUltimasTransacciones([]);
       } else {
         // 4. Calcular ahorros totales convertidos si es en USD
-        const totalAhorradoArs = resumenData.total_ahorrado_ars + (resumenData.total_ahorrado_usd * tipoCambio);
+        const totalAhorradoArs = (resumenData?.total_ahorrado_ars ?? 0) + ((resumenData?.total_ahorrado_usd ?? 0) * tipoCambio);
 
         setBalance({
-          total: resumenData.saldo_disponible,
-          ingresos: resumenData.total_ingresado,
-          egresos: resumenData.total_gastado,
+          total: resumenData?.saldo_disponible ?? 0,
+          ingresos: resumenData?.total_ingresado ?? 0,
+          egresos: resumenData?.total_gastado ?? 0,
           ahorros: totalAhorradoArs,
         });
 
         // 5. Mapear gastos de base de datos a Transaccion de la UI
-        const transaccionesGastos: Transaccion[] = gastosData.map((g) => ({
-          id: `g-${g.id}`,
+        const transaccionesGastos: Transaccion[] = (gastosData ?? []).map((g) => ({
+          id: `g-${g?.id ?? 0}`,
           tipo: 'gasto',
-          categoria: getCategoriaKeyById(g.categoria_id),
-          descripcion: g.descripcion,
-          monto: g.monto,
-          fecha: g.fecha,
+          categoria: getCategoriaKeyById(g?.categoria_id ?? 0),
+          descripcion: g?.descripcion ?? '',
+          monto: g?.monto ?? 0,
+          fecha: g?.fecha ?? '',
         }));
 
         // Mapear ahorros de base de datos a Transaccion de la UI
-        const transaccionesAhorros: Transaccion[] = ahorrosData
-          .filter((a) => a.periodo_id === currentPeriod.id)
+        const transaccionesAhorros: Transaccion[] = (ahorrosData ?? [])
+          .filter((a) => a && a.periodo_id === currentPeriod.id)
           .map((a) => ({
-            id: `a-${a.id}`,
+            id: `a-${a?.id ?? 0}`,
             tipo: 'ahorro',
             categoria: 'ahorro',
-            descripcion: a.descripcion,
-            monto: a.moneda === 'USD' ? a.monto * tipoCambio : a.monto,
-            fecha: a.fecha,
+            descripcion: a?.descripcion ?? '',
+            monto: a?.moneda === 'USD' ? (a?.monto ?? 0) * tipoCambio : (a?.monto ?? 0),
+            fecha: a?.fecha ?? '',
           }));
 
         // Mapear ingresos de base de datos a Transaccion de la UI
-        const transaccionesIngresos: Transaccion[] = ingresosData.map((i) => ({
-          id: `i-db-${i.id}`,
+        const transaccionesIngresos: Transaccion[] = (ingresosData ?? []).map((i) => ({
+          id: `i-db-${i?.id ?? 0}`,
           tipo: 'ingreso',
           categoria: 'trabajo',
-          descripcion: i.descripcion,
-          monto: i.monto,
-          fecha: i.fecha,
+          descripcion: i?.descripcion ?? '',
+          monto: i?.monto ?? 0,
+          fecha: i?.fecha ?? '',
         }));
 
         // Registrar dinero inicial como una transacción virtual de ingreso
@@ -116,8 +116,8 @@ export function useDashboard() {
           tipo: 'ingreso',
           categoria: 'trabajo',
           descripcion: 'Dinero Inicial Período',
-          monto: currentPeriod.dinero_inicial,
-          fecha: currentPeriod.created_at ? currentPeriod.created_at.split('T')[0] : '2026-05-01',
+          monto: currentPeriod?.dinero_inicial ?? 0,
+          fecha: currentPeriod?.created_at ? currentPeriod.created_at.split('T')[0] : '2026-05-01',
         };
 
         const todas = [transaccionInicial, ...transaccionesIngresos, ...transaccionesGastos, ...transaccionesAhorros];
@@ -130,7 +130,7 @@ export function useDashboard() {
         setUltimasTransacciones(ordenadas);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar los datos del panel.');
+      setError(err instanceof Error ? err : new Error('Error al cargar los datos del panel.'));
     } finally {
       setIsLoading(false);
     }

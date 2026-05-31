@@ -9,15 +9,15 @@ import { formatMoney } from '../../utils/currency';
 
 interface Props {
   titulo: string;
-  monto: number;
+  monto?: number;
   tipo?: 'principal' | 'secundario';
   color?: string;
   onPress?: () => void;
 }
 
-const SaldoCard: React.FC<Props> = ({ titulo, monto, tipo = 'secundario', color = '#2D6A4F', onPress }) => {
+const SaldoCard: React.FC<Props> = ({ titulo, monto = 0, tipo = 'secundario', color = '#2D6A4F', onPress }) => {
   const formatMonto = (val: number) => {
-    return formatMoney(val, 'ARS');
+    return formatMoney(val ?? 0, 'ARS');
   };
 
   const CardContent = () => {

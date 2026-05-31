@@ -6,45 +6,50 @@
 import React, { useMemo } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { PolarChart, Pie, CartesianChart, Bar } from 'victory-native';
 import { useFinanceStore } from '../../src/store/useFinanceStore';
 import { getDatosMesAnterior, CATEGORIAS } from '../../src/mocks/data';
 import ComparacionMensualCard from '../../src/components/features/ComparacionMensualCard';
 
 export default function ResumenScreen() {
-  const transacciones = useFinanceStore(state => state.transacciones);
-  const mesAnterior = getDatosMesAnterior();
+  const transacciones = useFinanceStore(state => state.transacciones) ?? [];
+  const mesAnterior = getDatosMesAnterior() ?? { gastos: 0, ahorros: 0 };
 
   const balance = useMemo(() => {
-    const ingresos = transacciones.filter(x => x.tipo === 'ingreso').reduce((a, b) => a + b.monto, 0);
-    const egresos = transacciones.filter(x => x.tipo === 'gasto').reduce((a, b) => a + b.monto, 0);
-    const ahorros = transacciones.filter(x => x.tipo === 'ahorro').reduce((a, b) => a + b.monto, 0);
+    const safeTrans = transacciones ?? [];
+    const ingresos = safeTrans.filter(x => x?.tipo === 'ingreso').reduce((a, b) => a + (b?.monto ?? 0), 0);
+    const egresos = safeTrans.filter(x => x?.tipo === 'gasto').reduce((a, b) => a + (b?.monto ?? 0), 0);
+    const ahorros = safeTrans.filter(x => x?.tipo === 'ahorro').reduce((a, b) => a + (b?.monto ?? 0), 0);
     return { total: ingresos - egresos, ingresos, egresos, ahorros };
   }, [transacciones]);
 
   const dataPie = useMemo(() => {
-    const gastos = transacciones.filter(t => t.tipo === 'gasto');
+    const safeTrans = transacciones ?? [];
+    const gastos = safeTrans.filter(t => t?.tipo === 'gasto');
     const mapa: Record<string, number> = {};
     gastos.forEach(g => { 
-      mapa[g.categoria] = (mapa[g.categoria] || 0) + g.monto; 
+      if (g?.categoria) {
+        mapa[g.categoria] = (mapa[g.categoria] || 0) + (g?.monto ?? 0); 
+      }
     });
 
     const colorScale = ["#2D6A4F", "#40916C", "#52B788", "#74C69D", "#95D5B2", "#B7E4C7", "#D8F3DC"];
     
     return Object.keys(mapa).map((key, index) => ({ 
-      x: CATEGORIAS.find(c => c.id === key)?.nombre || key, 
+      x: CATEGORIAS.find(c => c?.id === key)?.nombre || key, 
       y: mapa[key],
       color: colorScale[index % colorScale.length]
     }));
   }, [transacciones]);
 
-  const porcentajeAhorro = balance.ingresos > 0 ? (balance.ahorros / balance.ingresos) * 100 : 0;
-  const eficiencia = balance.ingresos > 0 ? ((1 - balance.egresos / balance.ingresos) * 100) : 0;
+  const porcentajeAhorro = (balance?.ingresos ?? 0) > 0 ? ((balance?.ahorros ?? 0) / (balance?.ingresos ?? 1)) * 100 : 0;
+  const eficiencia = (balance?.ingresos ?? 0) > 0 ? ((1 - (balance?.egresos ?? 0) / (balance?.ingresos ?? 1)) * 100) : 0;
 
   const dataBar = [
     { mes: 'Mar', monto: 120000 },
     { mes: 'Abr', monto: 150000 },
-    { mes: 'May', monto: balance.egresos }
+    { mes: 'May', monto: balance?.egresos ?? 0 }
   ];
 
   return (
@@ -69,26 +74,39 @@ export default function ResumenScreen() {
 
         <View className="bg-gray-50 dark:bg-zinc-900 p-5 rounded-[24px] mb-5 border border-gray-100 dark:border-zinc-800 shadow-sm">
           <Text className="text-base font-semibold text-gray-900 dark:text-white mb-4">Gastos por Categoría</Text>
-          <View style={{ height: 260, width: '100%' }}>
-            <PolarChart
-              data={dataPie}
-              labelKey="x"
-              valueKey="y"
-              colorKey="color"
-            >
-              <Pie.Chart />
-            </PolarChart>
-          </View>
-          <View className="flex-row flex-wrap justify-center mt-4">
-             {dataPie.map((item, i) => (
-               <View key={i} className="flex-row items-center mr-4 mb-2">
-                 <View className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: item.color }} />
-                 <Text className="text-xs text-gray-600 dark:text-zinc-400">
-                   {item.x}: {balance.egresos > 0 ? Math.round((item.y / balance.egresos) * 100) : 0}%
-                 </Text>
-               </View>
-             ))}
-          </View>
+          {dataPie.length > 0 ? (
+            <>
+              <View style={{ height: 260, width: '100%' }}>
+                <PolarChart
+                  data={dataPie}
+                  labelKey="x"
+                  valueKey="y"
+                  colorKey="color"
+                >
+                  <Pie.Chart />
+                </PolarChart>
+              </View>
+              <View className="flex-row flex-wrap justify-center mt-4">
+                 {dataPie.map((item, i) => (
+                   <View key={i} className="flex-row items-center mr-4 mb-2">
+                     <View className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: item.color }} />
+                     <Text className="text-xs text-gray-600 dark:text-zinc-400">
+                       {item.x}: {(balance?.egresos ?? 0) > 0 ? Math.round((item.y / (balance?.egresos ?? 1)) * 100) : 0}%
+                     </Text>
+                   </View>
+                 ))}
+              </View>
+            </>
+          ) : (
+            <View className="h-[260px] justify-center items-center">
+              <View className="w-12 h-12 bg-gray-100 dark:bg-zinc-800/50 rounded-full items-center justify-center mb-2">
+                <Ionicons name="pie-chart-outline" size={24} className="text-gray-400 dark:text-zinc-500" />
+              </View>
+              <Text className="text-sm text-gray-400 dark:text-zinc-500 text-center font-medium">
+                No hay gastos registrados en este período.
+              </Text>
+            </View>
+          )}
         </View>
 
         <View className="flex-row justify-between mb-5">

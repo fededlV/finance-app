@@ -12,7 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import SaldoCard from '../../src/components/features/SaldoCard';
 import TransaccionItem from '../../src/components/ui/TransaccionItem';
 import { useDashboard } from '../../src/hooks/useDashboard';
-import { api } from '../../src/services/api';
+import { api, NetworkError } from '../../src/services/api';
 import { maskArgentineInput, parseArgentineToCents } from '../../src/utils/currency';
 
 // ✅ Componente separado, fuera de HomeScreen
@@ -229,17 +229,29 @@ export default function HomeScreen() {
   }
 
   if (error && ultimasTransacciones.length === 0) {
+    const isNetworkError = error instanceof NetworkError;
+    const iconName = isNetworkError ? 'cloud-offline-outline' : 'alert-circle-outline';
+    const errorTitle = isNetworkError ? 'Sin Conexión' : 'Error del Sistema';
+    const errorDesc = isNetworkError 
+      ? 'No pudimos conectarnos al servidor. Por favor, verifica tu conexión de red.' 
+      : 'Ocurrió un error al procesar la información. Vuelve a intentarlo en unos momentos.';
+
     return (
       <SafeAreaView className="flex-1 bg-black justify-center items-center px-6" edges={['top']}>
-        <View className="bg-zinc-900 border border-red-900/50 p-6 rounded-3xl items-center w-full max-w-sm shadow-xl">
-          <View className="w-12 h-12 bg-red-950/50 rounded-full items-center justify-center mb-4">
-            <Text className="text-red-500 text-2xl font-bold">⚠️</Text>
+        <View className="bg-zinc-950 border border-zinc-900 p-8 rounded-[32px] items-center w-full max-w-sm shadow-2xl">
+          <View className="w-16 h-16 bg-[#2D6A4F]/10 rounded-full items-center justify-center mb-6">
+            <Ionicons name={iconName as any} size={32} color="#2D6A4F" />
           </View>
-          <Text className="text-white text-lg font-bold text-center mb-2">Error de conexión</Text>
-          <Text className="text-zinc-400 text-sm text-center mb-6">{error}</Text>
+          <Text className="text-white text-xl font-bold text-center mb-2">
+            {errorTitle}
+          </Text>
+          <Text className="text-zinc-500 text-sm text-center mb-8 px-2 leading-relaxed">
+            {errorDesc}
+          </Text>
+          
           <Pressable 
             onPress={refetch}
-            className="bg-red-900 px-6 py-3 rounded-2xl active:bg-red-800 w-full items-center"
+            className="bg-[#2D6A4F] px-6 py-4 rounded-2xl active:opacity-90 w-full items-center shadow-lg"
           >
             <Text className="text-white font-bold text-base">Reintentar</Text>
           </Pressable>
@@ -256,6 +268,19 @@ export default function HomeScreen() {
         renderItem={({ item }) => <TransaccionItem transaccion={item} />}
         ListHeaderComponent={<ListHeader balance={balance} />}
         ListFooterComponent={<View className="h-24" />}
+        ListEmptyComponent={
+          <View className="items-center justify-center py-12 px-6">
+            <View className="w-16 h-16 bg-[#2D6A4F]/10 rounded-full items-center justify-center mb-4">
+              <Ionicons name="receipt-outline" size={28} color="#2D6A4F" />
+            </View>
+            <Text className="text-white text-lg font-bold text-center">
+              No hay transacciones
+            </Text>
+            <Text className="text-zinc-500 text-sm text-center mt-2 max-w-xs leading-relaxed">
+              Aún no has agregado movimientos a este período. Comienza presionando "+ Nuevo" arriba.
+            </Text>
+          </View>
+        }
         showsVerticalScrollIndicator={false}
         initialNumToRender={5}
         windowSize={5}
