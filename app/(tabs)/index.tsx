@@ -3,15 +3,17 @@
  * Ubicación: app/(tabs)/index.tsx
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import SaldoCard from '../../src/components/features/SaldoCard';
 import TransaccionItem from '../../src/components/ui/TransaccionItem';
 import { useDashboard } from '../../src/hooks/useDashboard';
 import { api } from '../../src/services/api';
+import { maskArgentineInput, parseArgentineToCents } from '../../src/utils/currency';
 
 // ✅ Componente separado, fuera de HomeScreen
 function ListHeader({ balance }: { balance: { total: number; ingresos: number; egresos: number; ahorros: number } }) {
@@ -38,19 +40,29 @@ function ListHeader({ balance }: { balance: { total: number; ingresos: number; e
           titulo="Ingresos" 
           monto={balance.ingresos} 
           color="#27500A"
-          onPress={() => router.push({ pathname: '/gastos', params: { tipo: 'ingreso' } })}
+          onPress={() => router.push({ pathname: '/transacciones', params: { tipo: 'ingreso' } })}
         />
-        <SaldoCard titulo="Egresos" monto={balance.egresos} color="#791F1F" />
+        <SaldoCard 
+          titulo="Egresos" 
+          monto={balance.egresos} 
+          color="#791F1F" 
+          onPress={() => router.push({ pathname: '/transacciones', params: { tipo: 'gasto' } })}
+        />
       </View>
 
-      <SaldoCard titulo="Ahorros" monto={balance.ahorros} color="#185FA5" />
+      <SaldoCard 
+        titulo="Ahorros" 
+        monto={balance.ahorros} 
+        color="#185FA5" 
+        onPress={() => router.push({ pathname: '/transacciones', params: { tipo: 'ahorro' } })}
+      />
 
       <View className="flex-row justify-between items-center mt-6 mb-3">
         <Text className="text-white text-xl font-bold">
           Últimas Transacciones
         </Text>
         <Pressable 
-          onPress={() => router.push('/gastos')}
+          onPress={() => router.push('/transacciones')}
           className="active:opacity-70"
         >
           <Text className="text-[#2D6A4F] text-sm font-semibold">Ver todo</Text>
@@ -83,9 +95,9 @@ function InicializarPeriodoForm({
 
   const handleSubmit = async () => {
     setValidationError(null);
-    const monto = Number(dineroInicial.trim());
-    if (!dineroInicial.trim() || isNaN(monto) || monto < 0) {
-      setValidationError('Por favor ingresa un monto inicial válido (mayor o igual a 0).');
+    const rawCents = parseArgentineToCents(dineroInicial.trim());
+    if (!dineroInicial.trim() || isNaN(rawCents) || rawCents < 0) {
+      setValidationError('Por favor ingresa un dinero inicial válido (mayor o igual a 0).');
       return;
     }
 
@@ -101,12 +113,12 @@ function InicializarPeriodoForm({
         await api.crearPeriodo({
           mes,
           anio,
-          dinero_inicial: monto,
+          dinero_inicial: rawCents,
           tipo_cambio_usd: tc
         });
       } else {
         await api.actualizarPeriodo(periodoId, {
-          dinero_inicial: monto,
+          dinero_inicial: rawCents,
           tipo_cambio_usd: tc
         });
       }
@@ -142,11 +154,11 @@ function InicializarPeriodoForm({
             </Text>
             <TextInput
               className="bg-zinc-900 text-white p-4 rounded-2xl text-lg border border-zinc-800 focus:border-[#2D6A4F]"
-              placeholder="Ej. 500000"
+              placeholder="Ej. 500.000,00"
               placeholderTextColor="#52525b"
               keyboardType="numeric"
               value={dineroInicial}
-              onChangeText={setDineroInicial}
+              onChangeText={(text) => setDineroInicial(maskArgentineInput(text))}
             />
           </View>
 
@@ -189,6 +201,12 @@ function InicializarPeriodoForm({
 
 export default function HomeScreen() {
   const { isLoading, error, balance, periodo, ultimasTransacciones, refetch } = useDashboard();
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   if (isLoading && ultimasTransacciones.length === 0) {
     return (

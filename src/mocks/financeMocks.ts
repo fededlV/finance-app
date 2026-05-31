@@ -9,6 +9,7 @@ export const MOCK_RESUMEN: Resumen = {
     tipo_cambio_usd: 1200,
     created_at: '2026-05-01T10:00:00Z',
   },
+  total_ingresado: 500000,
   total_gastado: 150000, // $150,000.00
   total_ahorrado_ars: 50000, // $50,000.00
   total_ahorrado_usd: 100, // $100.00

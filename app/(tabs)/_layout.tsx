@@ -29,9 +29,9 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="gastos"
+        name="transacciones"
         options={{
-          title: "Gastos",
+          title: "Transacciones",
           tabBarIcon: ({ focused, color, size }) => (
             <Ionicons name={focused ? "list" : "list-outline"} size={size} color={color} />
           ),

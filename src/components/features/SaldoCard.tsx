@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { formatMoney } from '../../utils/currency';
 
 interface Props {
   titulo: string;
@@ -16,10 +17,7 @@ interface Props {
 
 const SaldoCard: React.FC<Props> = ({ titulo, monto, tipo = 'secundario', color = '#2D6A4F', onPress }) => {
   const formatMonto = (val: number) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
-    }).format(val);
+    return formatMoney(val, 'ARS');
   };
 
   const CardContent = () => {

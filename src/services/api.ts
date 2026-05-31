@@ -12,6 +12,9 @@ import type {
   Resumen,
   GastoPorCategoria,
   PresupuestoEstado,
+  Ingreso,
+  CrearIngresoInput,
+  GetIngresosFiltros,
 } from '../types/finance';
 
 const HANDLED_ERROR_STATUSES = new Set([400, 404, 409, 422, 500]);
@@ -32,6 +35,11 @@ type AhorroApi = Omit<Ahorro, 'monto'> & {
   monto: number;
 };
 
+type IngresoApi = Omit<Ingreso, 'created_at' | 'updated_at'> & {
+  creado_en: string;
+  modificado_en?: string | null;
+};
+
 type GastoPorCategoriaApi = Omit<GastoPorCategoria, 'total'> & {
   total: number;
 };
@@ -43,6 +51,7 @@ type PresupuestoEstadoApi = Omit<PresupuestoEstado, 'limite' | 'gastado'> & {
 
 type ResumenApi = {
   periodo: PeriodoApi;
+  total_ingresado: number;
   total_gastado: number;
   total_ahorrado_ars: number;
   total_ahorrado_usd: number;
@@ -141,6 +150,7 @@ const request = async <T>(
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
       ...(options.headers ?? {}),
     },
   });
@@ -170,38 +180,49 @@ const normalizePeriodo = (periodo: PeriodoApi): Periodo => {
   const { creado_en, ...rest } = periodo;
   return {
     ...rest,
-    dinero_inicial: fromCents(periodo.dinero_inicial),
+    dinero_inicial: periodo.dinero_inicial,
     created_at: creado_en,
   };
 };
 
 const normalizeGasto = (gasto: GastoApi): Gasto => ({
   ...gasto,
-  monto: fromCents(gasto.monto),
+  monto: gasto.monto,
 });
 
 const normalizeAhorro = (ahorro: AhorroApi): Ahorro => ({
   ...ahorro,
-  monto: fromCents(ahorro.monto),
+  monto: ahorro.monto,
 });
 
 const normalizeGastoPorCategoria = (gastoCat: GastoPorCategoriaApi): GastoPorCategoria => ({
   ...gastoCat,
-  total: fromCents(gastoCat.total),
+  total: gastoCat.total,
 });
 
 const normalizePresupuestoEstado = (presupuestoEst: PresupuestoEstadoApi): PresupuestoEstado => ({
   ...presupuestoEst,
-  limite: fromCents(presupuestoEst.limite),
-  gastado: fromCents(presupuestoEst.gastado),
+  limite: presupuestoEst.limite,
+  gastado: presupuestoEst.gastado,
 });
+
+const normalizeIngreso = (ingreso: IngresoApi): Ingreso => {
+  const { creado_en, modificado_en, ...rest } = ingreso;
+  return {
+    ...rest,
+    monto: ingreso.monto,
+    created_at: creado_en,
+    updated_at: modificado_en ?? undefined,
+  };
+};
 
 const normalizeResumen = (resumen: ResumenApi): Resumen => ({
   periodo: normalizePeriodo(resumen.periodo),
-  total_gastado: fromCents(resumen.total_gastado),
-  total_ahorrado_ars: fromCents(resumen.total_ahorrado_ars),
-  total_ahorrado_usd: fromCents(resumen.total_ahorrado_usd),
-  saldo_disponible: fromCents(resumen.saldo_disponible),
+  total_ingresado: resumen.total_ingresado,
+  total_gastado: resumen.total_gastado,
+  total_ahorrado_ars: resumen.total_ahorrado_ars,
+  total_ahorrado_usd: resumen.total_ahorrado_usd,
+  saldo_disponible: resumen.saldo_disponible,
   porcentaje_ahorro: resumen.porcentaje_ahorro,
   gastos_por_categoria: resumen.gastos_por_categoria.map(normalizeGastoPorCategoria),
   presupuestos_estado: resumen.presupuestos_estado.map(normalizePresupuestoEstado),
@@ -221,7 +242,7 @@ export const api = {
     try {
       const payload = {
         ...data,
-        dinero_inicial: toCents(data.dinero_inicial),
+        dinero_inicial: data.dinero_inicial,
       };
 
       const periodo = await request<PeriodoApi>(
@@ -242,7 +263,7 @@ export const api = {
     try {
       const payload: any = {};
       if (data.dinero_inicial !== undefined) {
-        payload.dinero_inicial = toCents(data.dinero_inicial);
+        payload.dinero_inicial = data.dinero_inicial;
       }
       if (data.tipo_cambio_usd !== undefined) {
         payload.tipo_cambio_usd = data.tipo_cambio_usd;
@@ -276,7 +297,7 @@ export const api = {
     try {
       const payload = {
         ...data,
-        monto: toCents(data.monto),
+        monto: data.monto,
       };
 
       const gasto = await request<GastoApi>(
@@ -306,7 +327,7 @@ export const api = {
     try {
       const payload = {
         ...data,
-        monto: toCents(data.monto),
+        monto: data.monto,
       };
 
       const ahorro = await request<AhorroApi>(
@@ -327,6 +348,37 @@ export const api = {
     try {
       const resumen = await request<ResumenApi>(`/resumen/${periodo_id}`, { method: 'GET' }, 'direct');
       return normalizeResumen(resumen);
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async getIngresos(filtros: GetIngresosFiltros = {}): Promise<Ingreso[]> {
+    try {
+      const queryString = buildQueryString(filtros as any);
+      const ingresos = await request<IngresoApi[]>(`/ingresos${queryString}`, { method: 'GET' });
+      return ingresos.map(normalizeIngreso);
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async crearIngreso(data: CrearIngresoInput): Promise<Ingreso> {
+    try {
+      const payload = {
+        ...data,
+        monto: data.monto,
+      };
+
+      const ingreso = await request<IngresoApi>(
+        '/ingresos',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        },
+      );
+
+      return normalizeIngreso(ingreso);
     } catch (error) {
       throw toFriendlyError(error);
     }

@@ -6,6 +6,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { formatMoney } from '../../utils/currency';
 
 interface Props {
   actual: number;
@@ -25,11 +26,7 @@ const ComparacionMensualCard: React.FC<Props> = ({ actual, anterior, titulo, tip
     : (actual > anterior ? 'arrow-up' : 'arrow-down');
 
   const formatCurrency = (monto: number) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
-      maximumFractionDigits: 0,
-    }).format(monto);
+    return formatMoney(monto, 'ARS');
   };
 
   return (

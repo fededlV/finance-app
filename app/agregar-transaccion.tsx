@@ -12,7 +12,8 @@ import {
   Pressable, 
   KeyboardAvoidingView, 
   Platform, 
-  ScrollView 
+  ScrollView,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,6 +21,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFinanceStore } from '../src/store/useFinanceStore';
 import { TipoTransaccion, Transaccion } from '../src/types';
 import { CATEGORIAS } from '../src/mocks/data';
+import { maskArgentineInput, parseArgentineToCents } from '../src/utils/currency';
+import { api } from '../src/services/api';
 
 export default function AgregarTransaccionScreen() {
   const router = useRouter();
@@ -29,6 +32,7 @@ export default function AgregarTransaccionScreen() {
   const [monto, setMonto] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [tipo, setTipo] = useState<TipoTransaccion>('gasto');
+  const [categoria, setCategoria] = useState('comida');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Selector de categoría por defecto según el tipo
@@ -39,7 +43,8 @@ export default function AgregarTransaccionScreen() {
   }, [tipo]);
 
   const handleGuardar = async () => {
-    if (!monto || isNaN(Number(monto)) || Number(monto) <= 0) {
+    const rawCents = parseArgentineToCents(monto.trim());
+    if (!monto.trim() || isNaN(rawCents) || rawCents <= 0) {
       // Validación básica
       return;
     }
@@ -49,18 +54,53 @@ export default function AgregarTransaccionScreen() {
     const nuevaTransaccion: Transaccion = {
       id: Math.random().toString(36).substring(2, 9),
       tipo,
-      monto: Number(monto),
+      monto: rawCents,
       descripcion: descripcion || (tipo.charAt(0).toUpperCase() + tipo.slice(1)),
-      categoria: categoriaDefault,
+      categoria: tipo === 'gasto' ? categoria : categoriaDefault,
       fecha: new Date().toISOString().split('T')[0],
     };
 
-    // Simulación de latencia de red (Regla de .clinerules)
-    setTimeout(() => {
+    try {
+      try {
+        const currentPeriod = await api.getPeriodoActual();
+        if (currentPeriod && currentPeriod.id > 0) {
+          if (tipo === 'gasto') {
+            await api.crearGasto({
+              periodo_id: currentPeriod.id,
+              categoria_id: getCategoriaIdByKey(categoria),
+              descripcion: nuevaTransaccion.descripcion,
+              monto: rawCents,
+              fecha: nuevaTransaccion.fecha,
+            });
+          } else if (tipo === 'ahorro') {
+            await api.crearAhorro({
+              periodo_id: currentPeriod.id,
+              descripcion: nuevaTransaccion.descripcion,
+              monto: rawCents,
+              moneda: 'ARS',
+              fecha: nuevaTransaccion.fecha,
+            });
+          } else if (tipo === 'ingreso') {
+            await api.crearIngreso({
+              periodo_id: currentPeriod.id,
+              descripcion: nuevaTransaccion.descripcion,
+              monto: rawCents,
+              fecha: nuevaTransaccion.fecha,
+            });
+          }
+        }
+      } catch (apiErr) {
+        console.warn('API registry failed, fallback to local store:', apiErr);
+      }
+
+      // Almacenamiento local para consistencia/mock
       addTransaccion(nuevaTransaccion);
       setIsSubmitting(false);
       router.back();
-    }, 500);
+    } catch (err) {
+      setIsSubmitting(false);
+      Alert.alert('Error', err instanceof Error ? err.message : 'Error al registrar la transacción.');
+    }
   };
 
   return (
@@ -123,7 +163,7 @@ export default function AgregarTransaccionScreen() {
                 placeholderTextColor="#27272a"
                 keyboardType="numeric"
                 value={monto}
-                onChangeText={setMonto}
+                onChangeText={(text) => setMonto(maskArgentineInput(text))}
                 autoFocus
               />
             </View>
@@ -141,6 +181,48 @@ export default function AgregarTransaccionScreen() {
                 onChangeText={setDescripcion}
               />
             </View>
+
+            {tipo === 'gasto' && (
+              <View className="mt-4">
+                <Text className="text-zinc-500 text-sm mb-3 ml-1">Categoría</Text>
+                <View className="flex-row flex-wrap justify-between">
+                  {[
+                    { key: 'comida', label: 'Comida', icon: 'fast-food' },
+                    { key: 'transporte', label: 'Transporte', icon: 'bus' },
+                    { key: 'ocio', label: 'Entretenimiento', icon: 'game-controller' },
+                    { key: 'salud', label: 'Salud', icon: 'medical' },
+                    { key: 'hogar', label: 'Servicios', icon: 'home' },
+                    { key: 'otro', label: 'Otros', icon: 'add-circle' },
+                  ].map((cat) => {
+                    const isSelected = categoria === cat.key;
+                    return (
+                      <Pressable
+                        key={cat.key}
+                        onPress={() => setCategoria(cat.key)}
+                        className={`w-[48%] flex-row items-center p-3.5 rounded-2xl mb-3 border ${
+                          isSelected 
+                            ? 'bg-[#2D6A4F]/20 border-[#2D6A4F]' 
+                            : 'bg-zinc-900 border-zinc-800'
+                        }`}
+                      >
+                        <Ionicons 
+                          name={cat.icon as any} 
+                          size={20} 
+                          color={isSelected ? '#2D6A4F' : '#a1a1aa'} 
+                        />
+                        <Text 
+                          className={`ml-2 font-semibold text-sm ${
+                            isSelected ? 'text-white' : 'text-zinc-400'
+                          }`}
+                        >
+                          {cat.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
           </View>
 
           <View className="flex-1" />
@@ -172,4 +254,17 @@ export default function AgregarTransaccionScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+function getCategoriaIdByKey(key: string): number {
+  const mapping: Record<string, number> = {
+    'comida': 1,
+    'transporte': 2,
+    'salud': 3,
+    'ocio': 4,
+    'hogar': 5,
+    'educacion': 7,
+    'otro': 8,
+  };
+  return mapping[key] || 8;
 }
