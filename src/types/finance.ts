@@ -140,3 +140,18 @@ export interface ApiErrorResponse {
   error: string;
   details?: unknown;
 }
+
+export interface ComparativaItem {
+  id: number;
+  mes: number;
+  anio: number;
+  total_gastado: number;
+  total_ahorrado_ars: number;
+}
+
+export interface ResumenComparativa {
+  periodo_actual: ComparativaItem;
+  periodo_anterior: ComparativaItem;
+  variacion_gastos_pct: number;
+  variacion_ahorros_pct: number;
+}
