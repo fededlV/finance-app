@@ -12,6 +12,9 @@ export interface Transaccion {
   descripcion: string;
   monto: number;
   fecha: string; // Formato ISO 8601 (YYYY-MM-DD)
+  moneda?: 'ARS' | 'USD';
+  origen?: string | null;
+  montoOriginal?: number;
 }
 
 export interface CategoriaInfo {

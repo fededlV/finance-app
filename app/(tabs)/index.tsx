@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, FlatList, Pressable, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -200,6 +200,7 @@ function InicializarPeriodoForm({
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { isLoading, error, balance, periodo, ultimasTransacciones, refetch } = useDashboard();
 
   useFocusEffect(
@@ -265,7 +266,20 @@ export default function HomeScreen() {
       <FlatList
         data={ultimasTransacciones}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <TransaccionItem transaccion={item} />}
+        renderItem={({ item }) => (
+          <Pressable
+            onPress={() => {
+              if (item.id.startsWith('i-') && !item.id.startsWith('i-db-')) {
+                Alert.alert('Información', 'El dinero inicial se edita configurando el período desde la pantalla de inicio.');
+                return;
+              }
+              router.push({ pathname: '/editar-transaccion', params: { id: item.id } });
+            }}
+            className="active:opacity-75"
+          >
+            <TransaccionItem transaccion={item} />
+          </Pressable>
+        )}
         ListHeaderComponent={<ListHeader balance={balance} />}
         ListFooterComponent={<View className="h-24" />}
         ListEmptyComponent={

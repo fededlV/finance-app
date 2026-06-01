@@ -415,6 +415,14 @@ export const api = {
     }
   },
 
+  async getComparativa(periodoId: number): Promise<any> {
+    try {
+      return await request<any>(`/resumen/${periodoId}/comparativa`, { method: 'GET' }, 'direct');
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
   async getIngresos(filtros: GetIngresosFiltros = {}): Promise<Ingreso[]> {
     try {
       const queryString = buildQueryString(filtros as any);
@@ -441,6 +449,132 @@ export const api = {
       );
 
       return normalizeIngreso(ingreso);
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async actualizarGasto(id: number, data: Partial<CrearGastoInput>): Promise<Gasto> {
+    try {
+      const gasto = await request<GastoApi>(
+        `/gastos/${id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        },
+      );
+      return normalizeGasto(gasto);
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async eliminarGasto(id: number): Promise<void> {
+    try {
+      await request<void>(`/gastos/${id}`, { method: 'DELETE' }, 'direct');
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async actualizarAhorro(id: number, data: Partial<CrearAhorroInput>): Promise<Ahorro> {
+    try {
+      const ahorro = await request<AhorroApi>(
+        `/ahorros/${id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        },
+      );
+      return normalizeAhorro(ahorro);
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async eliminarAhorro(id: number): Promise<void> {
+    try {
+      await request<void>(`/ahorros/${id}`, { method: 'DELETE' }, 'direct');
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async actualizarIngreso(id: number, data: Partial<CrearIngresoInput>): Promise<Ingreso> {
+    try {
+      const ingreso = await request<IngresoApi>(
+        `/ingresos/${id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        },
+      );
+      return normalizeIngreso(ingreso);
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async eliminarIngreso(id: number): Promise<void> {
+    try {
+      await request<void>(`/ingresos/${id}`, { method: 'DELETE' }, 'direct');
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async getPeriodos(): Promise<Periodo[]> {
+    try {
+      const periodos = await request<PeriodoApi[]>('/periodos', { method: 'GET' });
+      return (periodos ?? []).map(normalizePeriodo);
+    } catch (error) {
+      throw toFriendlyError(error);
+    }
+  },
+
+  async exportarPeriodoExcel(periodoId: number): Promise<string> {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/transacciones/exportar?periodo_id=${periodoId}`, {
+        method: 'GET',
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+        },
+      });
+
+      if (!response.ok) {
+        let errMsg = `Error HTTP ${response.status}`;
+        try {
+          const jsonBody = await response.json() as any;
+          if (jsonBody && typeof jsonBody.error === 'string') {
+            errMsg = jsonBody.error;
+          }
+        } catch {}
+        throw new ApiError(errMsg, response.status);
+      }
+
+      const buffer = await response.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.length;
+      let base64 = '';
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+      for (let i = 0; i < len; i += 3) {
+        const b1 = bytes[i];
+        const b2 = i + 1 < len ? bytes[i + 1] : 0;
+        const b3 = i + 2 < len ? bytes[i + 2] : 0;
+
+        const c1 = b1 >> 2;
+        const c2 = ((b1 & 3) << 4) | (b2 >> 4);
+        const c3 = ((b2 & 15) << 2) | (b3 >> 6);
+        const c4 = b3 & 63;
+
+        base64 += chars[c1] + chars[c2];
+        base64 += i + 1 < len ? chars[c3] : '=';
+        base64 += i + 2 < len ? chars[c4] : '=';
+      }
+
+      return base64;
     } catch (error) {
       throw toFriendlyError(error);
     }

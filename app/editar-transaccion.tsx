@@ -1,10 +1,10 @@
 /**
- * Propósito: Pantalla dedicada para el registro de nuevas transacciones.
+ * Propósito: Pantalla dedicada para la edición y actualización de transacciones existentes.
  * Estética: One UI / AMOLED Dark Mode.
- * Ubicación: app/agregar-transaccion.tsx
+ * Ubicación: app/editar-transaccion.tsx
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -13,39 +13,63 @@ import {
   KeyboardAvoidingView, 
   Platform, 
   ScrollView,
-  Alert
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useFinanceStore, getCategoriaIdByKey, selectMostFrequentCategory } from '../src/store/useFinanceStore';
+import { useFinanceStore, getCategoriaIdByKey } from '../src/store/useFinanceStore';
 import { TipoTransaccion } from '../src/types';
-import { maskArgentineInput, parseArgentineToCents } from '../src/utils/currency';
+import { maskArgentineInput, parseArgentineToCents, formatArgentineNumber } from '../src/utils/currency';
 
-export default function AgregarTransaccionScreen() {
+export default function EditarTransaccionScreen() {
   const router = useRouter();
-  const addTransaccion = useFinanceStore((state) => state.addTransaccion);
-  const mostFrequentCategory = useFinanceStore(selectMostFrequentCategory);
+  const { id } = useLocalSearchParams<{ id: string }>();
+
+  const transacciones = useFinanceStore((state) => state.transacciones);
+  const updateTransaccion = useFinanceStore((state) => state.updateTransaccion);
+  const deleteTransaccion = useFinanceStore((state) => state.deleteTransaccion);
+
+  // Buscar transacción
+  const transaccion = useMemo(() => {
+    return transacciones.find((t) => t.id === id);
+  }, [transacciones, id]);
 
   // Estado del formulario
   const [monto, setMonto] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [tipo, setTipo] = useState<TipoTransaccion>('gasto');
-  const [categoria, setCategoria] = useState(mostFrequentCategory || 'comida');
+  const [categoria, setCategoria] = useState('comida');
   const [moneda, setMoneda] = useState<'ARS' | 'USD'>('ARS');
   const [origen, setOrigen] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Selector de categoría por defecto según el tipo
-  const categoriaDefault = useMemo(() => {
-    if (tipo === 'ahorro') return 'ahorro';
-    if (tipo === 'ingreso') return 'otro';
-    return mostFrequentCategory || 'comida'; // Default para gasto
-  }, [tipo, mostFrequentCategory]);
+  // Cargar valores iniciales
+  useEffect(() => {
+    if (transaccion) {
+      // If it's a USD saving, pre-populate with the original USD cents. Otherwise, normal cents.
+      const displayCents = transaccion.tipo === 'ahorro' && transaccion.moneda === 'USD' && transaccion.montoOriginal !== undefined
+        ? transaccion.montoOriginal
+        : transaccion.monto;
+      
+      setMonto(formatArgentineNumber(displayCents));
+      setDescripcion(transaccion.descripcion);
+      setTipo(transaccion.tipo);
+      setCategoria(transaccion.categoria);
+      setMoneda(transaccion.moneda || 'ARS');
+      setOrigen(transaccion.origen || '');
+    }
+  }, [transaccion]);
 
-  React.useEffect(() => {
-    setCategoria(categoriaDefault);
-  }, [categoriaDefault]);
+  if (!transaccion) {
+    return (
+      <SafeAreaView className="flex-1 bg-black justify-center items-center">
+        <ActivityIndicator size="large" color="#2D6A4F" />
+        <Text className="text-zinc-400 mt-4 text-base font-semibold">Cargando transacción...</Text>
+      </SafeAreaView>
+    );
+  }
 
   const handleGuardar = async () => {
     const rawCents = parseArgentineToCents(monto.trim());
@@ -60,7 +84,7 @@ export default function AgregarTransaccionScreen() {
       let dataPayload: any = {
         descripcion: descripcion || (tipo.charAt(0).toUpperCase() + tipo.slice(1)),
         monto: rawCents,
-        fecha: new Date().toISOString().split('T')[0],
+        fecha: transaccion.fecha,
       };
 
       if (tipo === 'gasto') {
@@ -69,16 +93,43 @@ export default function AgregarTransaccionScreen() {
         dataPayload.moneda = moneda;
         if (origen.trim()) {
           dataPayload.origen = origen.trim();
+        } else {
+          dataPayload.origen = null;
         }
       }
 
-      await addTransaccion(tipo, dataPayload);
+      await updateTransaccion(transaccion.id, {
+        tipo,
+        data: dataPayload,
+      });
+
       setIsSubmitting(false);
       router.back();
     } catch (err) {
       setIsSubmitting(false);
-      Alert.alert('Error', err instanceof Error ? err.message : 'Error al registrar la transacción.');
+      Alert.alert('Error', err instanceof Error ? err.message : 'Error al actualizar la transacción.');
     }
+  };
+
+  const handleEliminar = () => {
+    Alert.alert('Eliminar registro', '¿Estás seguro de que querés eliminar este registro?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          setIsSubmitting(true);
+          try {
+            await deleteTransaccion(transaccion.id);
+            setIsSubmitting(false);
+            router.back();
+          } catch (err) {
+            setIsSubmitting(false);
+            Alert.alert('Error', err instanceof Error ? err.message : 'No se pudo eliminar la transacción.');
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -93,13 +144,21 @@ export default function AgregarTransaccionScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
-          <View className="px-6 pt-4 pb-8">
-            <Text className="text-white text-4xl font-bold tracking-tight">
-              Nuevo Registro
-            </Text>
-            <Text className="text-zinc-500 text-lg mt-1">
-              Ingresa los detalles de tu operación
-            </Text>
+          <View className="px-6 pt-4 pb-8 flex-row justify-between items-center">
+            <View>
+              <Text className="text-white text-4xl font-bold tracking-tight">
+                Editar Registro
+              </Text>
+              <Text className="text-zinc-500 text-lg mt-1">
+                Modifica los detalles de tu operación
+              </Text>
+            </View>
+            <Pressable
+              onPress={handleEliminar}
+              className="w-12 h-12 bg-red-950/20 border border-red-900/30 rounded-2xl items-center justify-center active:opacity-75"
+            >
+              <Ionicons name="trash-outline" size={22} color="#EF4444" />
+            </Pressable>
           </View>
 
           {/* Selector de Tipo */}
@@ -142,7 +201,6 @@ export default function AgregarTransaccionScreen() {
                 keyboardType="numeric"
                 value={monto}
                 onChangeText={(text) => setMonto(maskArgentineInput(text))}
-                autoFocus
               />
             </View>
           </View>
@@ -255,7 +313,7 @@ export default function AgregarTransaccionScreen() {
               }`}
             >
               <Text className="text-white text-lg font-bold">
-                {isSubmitting ? 'Guardando...' : 'Guardar Registro'}
+                {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
               </Text>
             </Pressable>
 
